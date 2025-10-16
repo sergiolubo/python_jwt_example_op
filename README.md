@@ -125,21 +125,20 @@ openssl rsa -in private.pem -pubout -out public.pem
 
 ```python
 # secure_auth.py
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from typing import Optional
-import pyotp
 
 app = FastAPI()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 USERS = {
-    "alice@example.com": {"password": pwd_context.hash("password123"), "role": "user", "totp_secret": pyotp.random_base32()},
-    "admin@example.com": {"password": pwd_context.hash("adminpass"), "role": "admin", "totp_secret": pyotp.random_base32()},
+    "alice@example.com": {"password": pwd_context.hash("password123"), "role": "user"},
+    "admin@example.com": {"password": pwd_context.hash("adminpass"), "role": "admin"},
 }
 
 with open("private.pem", "rb") as f:
@@ -152,12 +151,12 @@ AUD = "ucc-client"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-BLACKLIST = set()  # demo token revocation store (in-memory)
+BLACKLIST = set()
 
 class LoginIn(BaseModel):
     email: str
     password: str
-    totp: Optional[str] = None  # for MFA
+    totp: Optional[str] = None
 
 def verify_password(plain, hashed):
     return pwd_context.verify(plain, hashed)
@@ -179,12 +178,6 @@ def login(data: LoginIn):
     if not user or not verify_password(data.password, user["password"]):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     
-    if user.get("totp_secret"):
-        if not data.totp:
-            raise HTTPException(status_code=400, detail="TOTP required")
-        totp = pyotp.TOTP(user["totp_secret"])
-        if not totp.verify(data.totp):
-            raise HTTPException(status_code=401, detail="TOTP inválido")
     payload = {"sub": data.email, "role": user["role"]}
     access_token = create_access_token(payload, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     refresh_token = create_access_token(payload, expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
@@ -201,7 +194,7 @@ def verify_token(token: str):
     return payload
 
 @app.get("/admin")
-def admin_panel(authorization: Optional[str] = None):
+def admin_panel(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(401, "Missing token")
     token = authorization.split(" ")[1]
@@ -211,7 +204,7 @@ def admin_panel(authorization: Optional[str] = None):
     return {"secret": "sólo admins pueden ver esto (versión segura)"}
 
 @app.post("/logout")
-def logout(authorization: Optional[str] = None):
+def logout(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(401, "Missing token")
     token = authorization.split(" ")[1]
@@ -222,7 +215,7 @@ def logout(authorization: Optional[str] = None):
 **Instalación y ejecución**:
 
 ```bash
-pip install fastapi "python-jose[cryptography]" passlib[bcrypt] pyotp uvicorn
+pip install fastapi "python-jose[cryptography]" passlib "bcrypt==3.2.0" uvicorn
 uvicorn secure_auth:app --reload --port 8001
 ```
 
@@ -233,7 +226,6 @@ uvicorn secure_auth:app --reload --port 8001
 * `aud` y `iss` verificados en `jwt.decode`.
 * `exp` y `iat` usados.
 * Revocación (BLACKLIST) para logout/demo.
-* Ejemplo de MFA TOTP con `pyotp` — permite que añadas un paso de verificación extra (MFA).
 
 ---
 
@@ -247,23 +239,11 @@ curl -X POST "http://127.0.0.1:8000/login" -H "Content-Type: application/json" -
 
 2. Acceder admin con token forjado (vulnerable): usar script `exploit_forge.py` mostrado antes o enviar token `alg:none`.
 
-3. Login seguro (secure_auth.py) — con TOTP:
-
-   * Obtén TOTP secret mostrado al crear usuario (en demo `USERS[...]` tiene `totp_secret`). Genera code:
-
-```python
-import pyotp
-s = "SECRET_FROM_USERS"
-print(pyotp.TOTP(s).now())
-```
-
-* Luego:
+3. Login seguro (secure_auth.py):
 
 ```bash
-curl -X POST "http://127.0.0.1:8001/login" -H "Content-Type: application/json" -d '{"email":"admin@example.com","password":"adminpass","totp":"123456"}'
+curl -X POST "http://127.0.0.1:8001/login" -H "Content-Type: application/json" -d '{"email":"admin@example.com","password":"adminpass"}'
 ```
-
-(reemplaza totp con el generado).
 
 4. Acceder admin seguro:
 
