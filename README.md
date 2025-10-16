@@ -8,7 +8,7 @@ Guarda como `vulnerable_auth.py`
 
 ```python
 # vulnerable_auth.py
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 import jwt
 from typing import Optional
@@ -41,7 +41,7 @@ def insecure_decode_token(token: str):
     return payload
 
 @app.get("/admin")
-def admin_panel(authorization: Optional[str] = None):
+def admin_panel(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(401, "Missing token")
     
