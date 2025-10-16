@@ -265,7 +265,7 @@ Después de logout, el token ya no permite acceder.
 
 Sugerencia corta para evaluar el momento práctico (alineado con tu rúbrica institucional):
 
-* **Saber**: conceptos de JWT (firma vs cifrado vs claims), diferencias HS256 vs RS256, qué es `alg: none`, qué es TOTP, por qué `exp` y `aud` importan. (MCQ + una pregunta de justificar elección).
+* **Saber**: conceptos de JWT (firma vs cifrado vs claims), diferencias HS256 vs RS256, qué es `alg: none`, por qué `exp` y `aud` importan. (MCQ + una pregunta de justificar elección).
 * **Ser**: explicar responsabilidad ética de no publicar/compartir credenciales y de reportar vulnerabilidades, y por qué se exige MFA en aplicaciones críticas.
 * **Hacer**: en equipos, reciben un repo con el código vulnerable. Deben:
 
